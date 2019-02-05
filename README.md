@@ -6,11 +6,15 @@ Course material of the courses offered by the group
 
 ## winter school 2019
 
-5 - 8 February 2019 [https://www.france-bioinformatique.fr/en/evenements/CNRS_2019]()
+5 - 8 February 2019 [https://www.france-bioinformatique.fr/en/evenements/sincellTE_2019]()
 
 ### Monday :
+* [Welcome](2019/1_Welcome_Marie-Agnes_Dillies.pdf)
+* [Technologies and experimental approaches](2019/2_Technologies_and_experimental_approaches_Kevin_Lebrigand.pdf)
+* [Biological Applications](2019/3_Biological_Applications_Agnes_Paquet.pdf)
+* [Mapping, quality control and quantification](2019/4_Mapping_QC_Quantification.zip)
 
-
+### Tuesday :
 
 ## summer school 2018
 
