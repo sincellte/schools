@@ -1,6 +1,17 @@
 # schools
 Course material of the courses offered by the group
 
+1. [School 2019](#winter-school-2019)
+2. [School 2018](#summer-school-2018)
+
+## winter school 2019
+
+5 - 8 February 2019 [https://www.france-bioinformatique.fr/en/evenements/CNRS_2019]()
+
+### Monday :
+
+
+
 ## summer school 2018
 
 17 - 22 June 2018 [https://www.france-bioinformatique.fr/en/evenements/CNRS_2018]()
