@@ -15,8 +15,15 @@ Course material of the courses offered by the group
 * [Mapping, quality control and quantification](2019/4_Mapping_QC_Quantification.zip)
 
 ### Tuesday
+* [Experimental design and normalization](2019/5_Experimental_design_and_normalization_Agnes_Paquet.pdf)
+* [Normalization, UMI and spike-ins](2019/6_Normalization_UMI_Spike-ins_Agnes_Paquet.zip)
+* [Statistical models and analyses - Part 1](2019/7_Statistical_Models_and_Analyses_Antonio_Rausell_Part1_compressed.pdf)
+* [Statistical models and analyses : Practical](2019/8_Statistical_Models_and_Analyses_Akira_Cortal_Part1.zip)
 
 ### Wednesday
+* [Statistical models and analyses - Part 2](2019/9_Statistical_Models_and_Analyses_Antonio_Rausell_Part2.pdf)
+* [Statistical models and analyses - Practical Part 2](2019/10_Statistical_Models_and_Analyses_Akira_Cortal_Part2_Batch_Correction.zip) 
+* [Trajectory Analysis](2019/11_Trajectory_Analysis_Wouter_Saelens.pdf)
 
 ### Thursday
 
