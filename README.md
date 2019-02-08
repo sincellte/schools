@@ -20,7 +20,7 @@ Course material of the courses offered by the group
 
 ### Thursday
 
-* Epigenomics ([theory](2019/Single_cell_epigenomics_Theory.pdf) - [Practice](2019/Single_cell_epigenomics_Pratice.pdf))
+* Epigenomics ([Theory](2019/Single_cell_epigenomics_Theory.pdf) - [Practice](2019/Single_cell_epigenomics_Pratice.pdf))
 
 ### Friday
 
