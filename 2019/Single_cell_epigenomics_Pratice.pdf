@@ -1,0 +1,406 @@
+---
+title: "Single-Cell Transcriptomics and Epigenetics (sincellTE 2018) : epigenomics"
+author: "Morgane Thomas-Chollier, Nicolas Servant, Nathalie Lehmann"
+date: "2019-02-7"
+output: 
+  html_document: 
+    keep_md: yes
+    number_sections: yes
+    smart: no
+    toc: yes
+    toc_float: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{js, echo=FALSE, eval=F, include=F}
+$(document).ready(function() {
+
+  $chunks = $('.fold');
+
+  $chunks.each(function () {
+
+    // add button to source code chunks
+    if ( $(this).hasClass('s') ) {
+      $('pre.r', this).prepend("<div class=\"showopt\">Show Source</div><br style=\"line-height:22px;\"/>");
+      $('pre.r', this).children('code').attr('class', 'folded');
+    }
+
+    // add button to output chunks
+    if ( $(this).hasClass('o') ) {
+      $('pre:not(.r)', this).has('code').prepend("<div class=\"showopt\">Show Output</div><br style=\"line-height:22px;\"/>");
+      $('pre:not(.r)', this).children('code:not(r)').addClass('folded');
+
+      // add button to plots
+      $(this).find('img').wrap('<pre class=\"plot\"></pre>');
+      $('pre.plot', this).prepend("<div class=\"showopt\">Show Plot</div><br style=\"line-height:22px;\"/>");
+      $('pre.plot', this).children('img').addClass('folded');
+
+    }
+  });
+
+  // hide all chunks when document is loaded
+  $('.folded').css('display', 'none')
+
+  // function to toggle the visibility
+  $('.showopt').click(function() {
+    var label = $(this).html();
+    if (label.indexOf("Show") >= 0) {
+      $(this).html(label.replace("Show", "Hide"));
+    } else {
+      $(this).html(label.replace("Hide", "Show"));
+    }
+    $(this).siblings('code, img').slideToggle('fast', 'swing');
+  });
+});
+```
+
+```{css, echo=FALSE}
+.showopt {
+  background-color: #004c93;
+  color: #FFFFFF; 
+  width: 100px;
+  height: 20px;
+  text-align: center;
+  vertical-align: middle !important;
+  float: right;
+  font-family: sans-serif;
+  border-radius: 8px;
+}
+
+.showopt:hover {
+    background-color: #dfe4f2;
+    color: #004c93;
+}
+
+pre.plot {
+  background-color: white !important;
+}
+```
+
+```{r setup, cache = F, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+Sys.setenv("LANGUAGE"="EN")
+require(tidyverse)
+```
+
+This tutorial is based on the [Fly ATAC Atlas](https://shendurelab.github.io/fly-atac/docs/) (Shendure, Trapnell and Furlong labs). 
+
+This notebook will walk you through some of the analyses presented in Cusanovich et. al ([Nature 2018](https://www.nature.com/articles/nature25981)) for working with sci-ATAC-seq data from developing Drosophila melanogaster embryos.
+
+# <span style="color:#FFA07A">__Prepare the environnement__</span>
+
+Load libraries
+
+```{r, message=FALSE}
+library(proxy)
+library(gplots)
+library(Rtsne)
+library(densityClust)
+library(irlba)
+library(Matrix)
+library(monocle)
+```
+
+# <span style="color:#FFA07A">__Use case 1 : Cell clustering based on patterns of chromatin accessibility__</span>
+
+## Load the data
+```{r}
+dir = "/projet/sbr/sincellte/sc_epigenomics/"
+flies_6to8 = readRDS(paste0(dir, "6to8.2kbmatrix.sparse.binary.rds"))
+```
+
+Data = a sparse, binary matrix of genomic regions x cells.
+rows : 83,290 distinct 2kb windows in the genome
+columns 7,880 cells at the 6-8 hour time point ( cells are represented by barcodes)
+
+## Exploration of the matrix
+
+let's have a first look at this matrix
+```{r}
+ncol(flies_6to8) # 7880 cells 
+nrow(flies_6to8) # 83,290 windows
+
+```
+
+<div class="fold o">
+```{r}
+flies_6to8[1:2,1:2]
+```
+</div>
+
+and some summary statistics
+
+<div class="fold o">
+```{r}
+# number of cells for which there is signal found per 2kb window
+summary(Matrix::rowSums(flies_6to8))
+# number of 2kb windows with signal per cell
+summary(Matrix::colSums(flies_6to8))
+```
+</div>
+
+```{r}
+head(Matrix::rowSums(flies_6to8))
+```
+
+We can see that some 2kb windows do not have signal in any cells, while other windows have signal in many cells.
+
+Visualisation of summary as a histogram
+
+```{r}
+num_cells_ncounted = Matrix::rowSums(flies_6to8)
+options(repr.plot.width=4, repr.plot.height=4)
+hist(num_cells_ncounted,main="Nb cells with signal found for each 2kb window",breaks=50, xlab ="Number of cells", ylab="Number of 2kb windows")
+```
+
+We observed that the majority of windows do not have signal in any cells.
+
+Warning : in the original tutorial, the plot is shown as log10 of the counts. This plot is misleading because the "0" values are not taken into account.
+
+```{r}
+num_cells_ncounted = Matrix::rowSums(flies_6to8)
+options(repr.plot.width=4, repr.plot.height=4)
+hist(log10(num_cells_ncounted),main="Original plot",breaks=50, xlab ="log(Number of cells)", ylab="Number of 2kb windows")
+abline(v=log10(num_cells_ncounted[order(num_cells_ncounted,decreasing=T)[20000]]),lwd=2,col="indianred")
+```
+
+The corrected plot of log(counts), with a pseudo-count of 1 is shown below
+
+```{r}
+num_cells_ncounted = Matrix::rowSums(flies_6to8)
+options(repr.plot.width=4, repr.plot.height=4)
+hist(log10(1+num_cells_ncounted),main="Corrected plot : Nb cells with signal found for each 2kb window",breaks=50, xlab ="log(Number of cells)", ylab="Number of 2kb windows")
+abline(v=log10(num_cells_ncounted[order(num_cells_ncounted,decreasing=T)[20000]]),lwd=2,col="indianred")
+```
+
+
+## Filter the matrix
+
+Now let’s only retain the most commonly used sites (top 20,000 here). Median of 3,751 windows covered by each cell
+
+```{r}
+ncounts = flies_6to8[which(num_cells_ncounted >= num_cells_ncounted[order(num_cells_ncounted,decreasing=T)[20000]]),]
+new_counts = Matrix::colSums(ncounts)
+hist(new_counts,main="Number of sites each Cell uses",breaks=50,xlab ="Number of 2kb windows (sites)", ylab="Number of cells")
+#hist(log10(1+new_counts),main="Number of sites each Cell uses",breaks=50,xlab ="Number of 2kb windows (sites)", ylab="Number of cells")
+abline(v=quantile(new_counts,probs=0.1),lwd=2,col="blue")
+```
+
+Before transforming the data, we just filter out the lowest 10% of cells (in terms of site coverage) and ensure that there are now empty sites.
+
+```{r}
+ncounts = ncounts[,new_counts >= quantile(new_counts,probs=0.1)]
+ncounts = ncounts[Matrix::rowSums(ncounts) > 0,]
+```
+
+## Transform the matrix
+
+We can now transform the data using TF-IDF and then generate a lower dimensional representation of the data with truncated SVD (these are the two primary steps of LSI).
+```{r}
+nfreqs = t(t(ncounts) / Matrix::colSums(ncounts))
+idf = as(log(1 + ncol(ncounts) / Matrix::rowSums(ncounts)), "sparseVector")
+tf_idf_counts = as(Diagonal(x=as.vector(idf)), "sparseMatrix") %*% nfreqs
+```
+
+Here, we only retain components 2-6 (component 1 is highly correlated with read depth) and truncate the distribution of LSI values at +/-1.5.
+
+```{r}
+ #This step can take a minute
+set.seed(0) #For reproducibility
+SVD = irlba(tf_idf_counts, 6, 6)
+sk_diag = matrix(0, nrow=6, ncol=6)
+diag(sk_diag) = SVD$d
+sk_diag[1,1] = 0
+    
+```
+
+irlba allows to find a few approximate singular values and corresponding singular vectors of a matrix. It is a fast and memory-efficient way to compute a partial SVD.
+[SVD = décomposition en valeurs singulières => utilisé en général pour l'ACP (pour calcul valeurs propres et vecteurs propres)]
+
+## Generate dendrograms (hierarchical clustering)
+
+Cluster genes and cells, to have the dendrograms to plot on the heatmap
+
+```{r}
+#This step can take a minute too
+hclust_cells = hclust(proxy::dist(t(sk_diag %*% t(SVD$v)), method="cosine"), method="ward.D2")
+hclust_genes = hclust(proxy::dist(t(sk_diag %*% t(SVD$u)), method="cosine"), method="ward.D2")
+    
+color_pal = c("#1F78B4","#FFD700","#60CC52","#E31A1C")
+hmcols = colorpanel(100, "steelblue", "white", "tomato")
+cells_tree_cut = cutree(hclust_cells, 4)
+lsi_cells = cbind(colnames(ncounts),cells_tree_cut)
+```
+
+Run the clustering (Warning : memory consuming !!)
+
+```{r, fig.width=3, fig.height=8, eval=FALSE}
+LSI_out = t(t(sk_diag %*% t(SVD$v)) %*% t(SVD$u))
+LSI_out = t(scale(t(LSI_out)))
+LSI_out[LSI_out > 1.5] = 1.5
+LSI_out[LSI_out < -1.5] = -1.5
+
+options(repr.plot.width=4, repr.plot.height=6)
+heatmap.2(LSI_out, 
+              col=hmcols,
+              ColSideColors=color_pal[as.factor(cells_tree_cut)],
+              #RowSideColors=color_pal[as.factor(genes_tree_cut)],
+              Rowv = as.dendrogram(hclust_genes), Colv = as.dendrogram(hclust_cells),
+              labRow=FALSE, labCol=FALSE, trace="none",  scale="none",
+              useRaster=TRUE, xlab = "cells", ylab="2kb windows (sites)")
+
+```
+
+## Clean environment
+```{r}
+rm(flies_6to8)
+rm(ncounts)
+rm(nfreqs)
+rm(tf_idf_counts)
+rm(SVD)
+#rm(LSI_out)
+```
+
+# <span style="color:#FFA07A">__Use case 2 : Dimension reduction with t-SNE__</span>
+To refine the analysis to the regulatory element level (learn about the individual regulatory elements that govern distinct cell states), the authors have pooled the cells, called peaks, extracted the peaks summits, and compiled these data in a binary matrix of "sites" (peak) per cell.
+
+## Load the data
+```{r}
+dir = "/projet/sbr/sincellte/sc_epigenomics/"
+flies_6to8 = readRDS(paste0(dir, "6to8.summitmatrix.sparse.binary.rds"))
+```
+
+Data = a sparse, binary matrix of peaks x cells.
+rows : 53,133 distinct peaks in the genome
+columns: 7,880 cells at the 6-8 hour time point (cells are represented by barcodes)
+
+## Exploration of the matrix
+
+let's have a first look at this matrix
+```{r}
+dir = "/projet/sbr/sincellte/sc_epigenomics/"
+fly_summits_6to8 = readRDS(paste0(dir, "6to8.summitmatrix.sparse.binary.rds"))
+```
+
+<div class="fold o">
+```{r}
+dim(fly_summits_6to8)
+fly_summits_6to8[1:2,1:2]
+# number of cells for which there is signal found per peak
+summary(Matrix::rowSums(fly_summits_6to8))
+# number of peaks with signal per cell
+summary(Matrix::colSums(fly_summits_6to8))
+```
+</div>
+
+```{r}
+num_cells_ncounted = Matrix::rowSums(fly_summits_6to8)
+options(repr.plot.width=4, repr.plot.height=4)
+hist(num_cells_ncounted,main="No. of Cells Each Site is Observed In",breaks=50,xlab ="Number of cells", ylab="Number of peaks")
+abline(v=min(num_cells_ncounted[num_cells_ncounted >= dim(fly_summits_6to8)[2]*0.05]),lwd=2,col="indianred")
+```
+
+## Filter the matrix
+
+The analysis starts out similarly to the LSI example above. We first filter out sites that are seen in fewer cells (in this case we only keep sites that are seen in at least 5% of cells) and then cells that have relatively low coverage (again, we filter out the lowest 10% of cells).
+
+```{r}
+ncounts = fly_summits_6to8[num_cells_ncounted >= dim(fly_summits_6to8)[2]*0.05,]
+
+new_counts = Matrix::colSums(ncounts)
+ncounts = ncounts[,new_counts >= quantile(new_counts,probs=0.1)]
+ncounts = ncounts[Matrix::rowSums(ncounts) > 0,]
+    
+hist(new_counts,main="Number of Sites Each Cell Uses",breaks=50,xlab ="Number of peaks (sites)", ylab="Number of cells")
+abline(v=quantile(new_counts,probs=0.1),lwd=2,col="indianred")
+```
+
+## Transform the matrix
+The next step is to tranform the data and generate a lower dimensional representation again, except that we first filter out sex chromosome counts. We also leave the first component in now, and we use 50 dimensions (rather than 6).
+
+```{r}
+    sexsites = c(grep("chrY",rownames(ncounts)),grep("chrX",rownames(ncounts)))
+    ncounts.nosex = ncounts[-sexsites,]
+    
+    nfreqs = t(t(ncounts.nosex) / Matrix::colSums(ncounts.nosex))
+    idf = as(log(1 + ncol(ncounts.nosex) / Matrix::rowSums(ncounts.nosex)), "sparseVector")
+    tf_idf_counts = as(Diagonal(x=as.vector(idf)), "sparseMatrix") %*% nfreqs
+    
+    set.seed(0)
+    SVDtsne = irlba(tf_idf_counts, 50, 50)
+    d_diagtsne = matrix(0, nrow=50, ncol=50)
+    diag(d_diagtsne) = SVDtsne$d
+    SVDtsne_vd = t(d_diagtsne %*% t(SVDtsne$v))
+
+
+    dim(ncounts.nosex)
+    ncounts.nosex[1:2,1:2]
+    tf_idf_counts[1:2,1:2]
+```
+
+Next, we use t-SNE to visualize the data. We feed this lower dimensional representation of the data directly into the Rtsne package.
+
+```{r}
+    set.seed(0)
+    tsnetfidf = Rtsne(SVDtsne_vd,pca=F)
+```
+
+To identify clusters of cells, we use the density peak algorithm.
+
+```{r}
+ tsnedist = dist(tsnetfidf$Y)
+    set.seed(0)
+    dclust = densityClust(tsnedist,gaussian=T)
+    dclust = findClusters(dclust, rho = 50, delta = 2.5)
+```
+
+The density peak algorithm requires you to set two parameters - “delta” and “rho”. For each data point, the algorithm calculates a local density of other points within some set distance and the minimum distance to the next point that has a higher local density. On the basis of these two values, you can choose a set of points that are outliers both in local density and the distance to another point with a higher density, which become cluster “peaks”. Below, we show you the distribution of these two values in our data set and where we decided to draw the cutoff. You can read more about this algorithm [here](http://science.sciencemag.org/content/344/6191/1492).
+
+```{r}
+ options(repr.plot.width=6, repr.plot.height=6)
+    plot(dclust$rho,dclust$delta,pch=20,cex=0.6)
+    points(dclust$rho[dclust$peaks],dclust$delta[dclust$peaks],col="red",pch=20,cex=0.8)
+    text(dclust$rho[dclust$peaks]-2,dclust$delta[dclust$peaks]+1.5,labels=dclust$clusters[dclust$peaks])
+    abline(v=50)
+    abline(h=2.5)
+```
+
+Finally, we plot the t-SNE plots and show how the points are related to our original LSI clustering, the assigned sex of each cell (you’ll need to download an additional file for this), and current density peak clusters.
+
+```{r}
+dir = "/projet/sbr/sincellte/sc_epigenomics/"
+sexcolors = read.table(paste0(dir,"6to8.xycalls.txt"))
+
+ tsnecols = c("#E31A1C","#FFD700","#771122","#777711","#1F78B4","#68228B","#AAAA44",
+                 "#60CC52","#771155","#DDDD77","#774411","#AA7744","#AA4455","#117744",
+                 "#000080","#44AA77","#AA4488","#DDAA77")
+    options(repr.plot.width=8, repr.plot.height=8)
+    par(mfrow=c(2,2))
+    plot(tsnetfidf$Y,pch=20,main="No Clusters",cex=0.25)
+    plot(tsnetfidf$Y,pch=20,
+         col=c("#1F78B4","#FFD700","#60CC52","#E31A1C")[as.factor(lsi_cells[match(colnames(tf_idf_counts),lsi_cells[,1]),2])],
+         main="LSI Clusters",cex=0.25)
+    plot(tsnetfidf$Y,pch=20,col=c("blue","red")[sexcolors[match(colnames(tf_idf_counts),sexcolors[,1]),2]],
+         main="Male/Female Coloring",cex=0.25)
+    plot(tsnetfidf$Y,pch=20,col=tsnecols[as.factor(dclust$clusters)],main="Density Peak Clusters",cex=0.25)
+    text(tsnetfidf$Y[dclust$peaks,1],tsnetfidf$Y[dclust$peaks,2],labels=dclust$clusters[dclust$peaks],cex=2.5)
+
+```
+
+# <span style="color:#FFA07A">__Ressources and References__</span>
+
+<div class="fold o">
+```{r}
+sessionInfo()
+```
+</div>
+
+## Resources
+
+- [Base R cheat sheet](http://github.com/rstudio/cheatsheets/raw/master/base-r.pdf)
+- [Advanced R cheat sheet](https://www.rstudio.com/wp-content/uploads/2016/02/advancedR.pdf)
+- [Rstudio cheat sheet](https://github.com/rstudio/cheatsheets/raw/master/rstudio-ide.pdf)
+- [R markdown cheat sheet](https://github.com/rstudio/cheatsheets/raw/master/rmarkdown-2.0.pdf)
+- [Regular Expression](https://www.rstudio.com/wp-content/uploads/2016/09/RegExCheatsheet.pdf)
+
