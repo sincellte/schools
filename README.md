@@ -1,5 +1,5 @@
 # schools
-Course material of the courses offered by the group
+Course material of the **single-cell transcriptomics and epigenomics course** offered by the group
 
 1. [School 2019](#winter-school-2019)
 2. [School 2018](#summer-school-2018)
