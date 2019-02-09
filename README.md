@@ -8,7 +8,7 @@ Course material of the courses offered by the group
 
 5 - 8 February 2019 [https://www.france-bioinformatique.fr/en/evenements/sincellTE_2019]()
 
-### Monday :
+### Monday
 * [Welcome](2019/1_Welcome_Marie-Agnes_Dillies.pdf)
 * [Technologies and experimental approaches](2019/2_Technologies_and_experimental_approaches_Kevin_Lebrigand.pdf)
 * [Biological Applications](2019/3_Biological_Applications_Agnes_Paquet.pdf)
@@ -30,6 +30,8 @@ Course material of the courses offered by the group
 * Epigenomics ([Theory](2019/Single_cell_epigenomics_Theory.pdf) - [Practice](2019/Single_cell_epigenomics_Pratice.Rmd))
 
 ### Friday
+* [SCENIC](2019/14_SCENIC_Sara_Aibar_compressed.pdf) 
+* [cisTopic](2019/15_cisTopic_Carmen_Bravo_compressed.pdf))
 
 ## summer school 2018
 
